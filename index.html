@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chess Bot</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <header>
+            <h1>♟ Chess Bot</h1>
+        </header>
+
+        <div id="game-container">
+            <div id="left-panel">
+                <div id="status-panel">
+                    <div id="status-message">Blanc commence</div>
+                    <div id="turn-indicator">
+                        <span id="turn-color" class="white-turn">● Blancs</span>
+                    </div>
+                </div>
+
+                <div id="captured-pieces">
+                    <div class="captured-row" id="captured-black">
+                        <span class="captured-label">Blancs ont capturé :</span>
+                        <div id="captured-black-pieces"></div>
+                    </div>
+                    <div class="captured-row" id="captured-white">
+                        <span class="captured-label">Noirs ont capturé :</span>
+                        <div id="captured-white-pieces"></div>
+                    </div>
+                </div>
+
+                <div id="evaluation-panel">
+                    <div class="eval-label">Évaluation</div>
+                    <div id="eval-bar-container">
+                        <div id="eval-bar">
+                            <div id="eval-fill"></div>
+                        </div>
+                        <div id="eval-score">0.0</div>
+                    </div>
+                </div>
+
+                <div id="move-history">
+                    <div class="history-label">Historique des coups</div>
+                    <div id="history-list"></div>
+                </div>
+            </div>
+
+            <div id="board-container">
+                <div id="board-wrapper">
+                    <div id="board"></div>
+                </div>
+            </div>
+
+            <div id="right-panel">
+                <div id="controls">
+                    <h3>Paramètres</h3>
+
+                    <div class="control-group">
+                        <label>Mode de jeu</label>
+                        <select id="game-mode">
+                            <option value="human-vs-ai">Humain vs IA</option>
+                            <option value="ai-vs-ai">IA vs IA</option>
+                            <option value="human-vs-human">Humain vs Humain</option>
+                        </select>
+                    </div>
+
+                    <div class="control-group">
+                        <label>Jouer en tant que</label>
+                        <select id="player-color">
+                            <option value="white">Blancs</option>
+                            <option value="black">Noirs</option>
+                        </select>
+                    </div>
+
+                    <div class="control-group">
+                        <label>Temps de calcul</label>
+                        <select id="ai-depth">
+                            <option value="1000">Rapide (1s)</option>
+                            <option value="3000">Normal (3s)</option>
+                            <option value="7000">Fort (7s)</option>
+                            <option value="10000" selected>Maximum (10s)</option>
+                        </select>
+                    </div>
+
+                    <button id="new-game-btn" class="btn btn-primary">Nouvelle partie</button>
+                    <button id="undo-btn" class="btn btn-secondary">Annuler coup</button>
+                    <button id="flip-board-btn" class="btn btn-secondary">Retourner l'échiquier</button>
+                    <button id="resign-btn" class="btn btn-danger">Abandonner</button>
+                </div>
+
+                <div id="ai-thinking" style="display:none;">
+                    <div class="thinking-spinner"></div>
+                    <span>IA réfléchit...</span>
+                </div>
+
+                <div id="ai-info">
+                    <h3>Analyse IA</h3>
+                    <div class="info-row">
+                        <span>Nœuds évalués :</span>
+                        <span id="nodes-count">0</span>
+                    </div>
+                    <div class="info-row">
+                        <span>Profondeur atteinte :</span>
+                        <span id="depth-reached">0</span>
+                    </div>
+                    <div class="info-row">
+                        <span>Temps de calcul :</span>
+                        <span id="calc-time">0ms</span>
+                    </div>
+                    <div class="info-row">
+                        <span>Meilleur coup :</span>
+                        <span id="best-move-display">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="promotion-modal" style="display:none;">
+            <div id="promotion-dialog">
+                <h3>Promotion du pion</h3>
+                <div id="promotion-choices"></div>
+            </div>
+        </div>
+
+        <div id="game-over-modal" style="display:none;">
+            <div id="game-over-dialog">
+                <h2 id="game-over-title"></h2>
+                <p id="game-over-message"></p>
+                <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+                    <button id="game-over-new-game" class="btn btn-primary">Nouvelle partie</button>
+                    <button id="export-pgn-btn" class="btn btn-secondary">Exporter PGN</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="chess.js"></script>
+    <script src="ai.js"></script>
+    <script src="ui.js"></script>
+</body>
+</html>
