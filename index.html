@@ -85,6 +85,19 @@
                         </select>
                     </div>
 
+                    <div class="control-group">
+                        <label>Position FEN</label>
+                        <input type="text" id="fen-input" placeholder="Coller un FEN ici…" spellcheck="false" autocomplete="off">
+                        <select id="fen-ai-side" style="margin-top:4px;">
+                            <option value="black">IA joue les Noirs</option>
+                            <option value="white">IA joue les Blancs</option>
+                            <option value="both">IA vs IA</option>
+                            <option value="none">Humain vs Humain</option>
+                        </select>
+                        <button id="load-fen-btn" class="btn btn-secondary" style="margin-top:4px;">Charger position</button>
+                        <div id="fen-error" style="color:#e74c3c;font-size:0.8em;margin-top:4px;display:none;"></div>
+                    </div>
+
                     <button id="new-game-btn" class="btn btn-primary">Nouvelle partie</button>
                     <button id="undo-btn" class="btn btn-secondary">Annuler coup</button>
                     <button id="flip-board-btn" class="btn btn-secondary">Retourner l'échiquier</button>

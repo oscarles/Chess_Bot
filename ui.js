@@ -483,6 +483,57 @@ document.getElementById('resign-btn').addEventListener('click', () => {
 
 document.getElementById('game-over-new-game').addEventListener('click', newGame);
 
+document.getElementById('load-fen-btn').addEventListener('click', () => {
+    const fenInput = document.getElementById('fen-input');
+    const fenError = document.getElementById('fen-error');
+    const fen = fenInput.value.trim();
+    if (!fen) return;
+
+    try {
+        stopAiVsAi();
+        if (aiWorker) aiWorker.onmessage = null;
+        game.loadFEN(fen);
+        ai = new ChessAI();
+        ai.tt.clear();
+        selectedSquare = null;
+        legalMovesCache = [];
+        aiRunning = false;
+        pendingPromotion = null;
+        document.getElementById('game-over-modal').style.display = 'none';
+        document.getElementById('promotion-modal').style.display = 'none';
+        fenError.style.display = 'none';
+
+        // Synchronise les sélecteurs de mode selon le choix IA
+        const aiSide = document.getElementById('fen-ai-side').value;
+        if (aiSide === 'both') {
+            gameModeSelect.value = 'ai-vs-ai';
+        } else if (aiSide === 'none') {
+            gameModeSelect.value = 'human-vs-human';
+        } else {
+            gameModeSelect.value = 'human-vs-ai';
+            // Le joueur humain est l'adversaire de l'IA
+            playerColorSel.value = aiSide === 'black' ? 'white' : 'black';
+        }
+
+        buildBoard();
+        updateSidePanels({});
+        nodesCount.textContent = '0';
+        depthReached.textContent = '0';
+        calcTime.textContent = '0ms';
+        bestMoveDisplay.textContent = '-';
+
+        if (aiSide === 'both') {
+            startAiVsAi();
+        } else if (aiSide !== 'none') {
+            // L'IA joue si c'est son tour
+            if (game.turn === aiSide) setTimeout(runAI, 300);
+        }
+    } catch (err) {
+        fenError.textContent = err.message;
+        fenError.style.display = 'block';
+    }
+});
+
 document.getElementById('export-pgn-btn').addEventListener('click', () => {
     const mode = gameModeSelect.value;
     const playerColor = playerColorSel.value;

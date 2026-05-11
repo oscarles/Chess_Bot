@@ -532,6 +532,61 @@ class ChessGame {
         return false;
     }
 
+    loadFEN(fen) {
+        const parts = fen.trim().split(/\s+/);
+        const rows = parts[0].split('/');
+        if (rows.length !== 8) throw new Error('FEN invalide : 8 rangées attendues');
+
+        const FEN_PIECES = {
+            'P': PIECES.W_PAWN,   'N': PIECES.W_KNIGHT, 'B': PIECES.W_BISHOP,
+            'R': PIECES.W_ROOK,   'Q': PIECES.W_QUEEN,  'K': PIECES.W_KING,
+            'p': PIECES.B_PAWN,   'n': PIECES.B_KNIGHT, 'b': PIECES.B_BISHOP,
+            'r': PIECES.B_ROOK,   'q': PIECES.B_QUEEN,  'k': PIECES.B_KING,
+        };
+
+        this.board = Array.from({length: 8}, () => new Array(8).fill(0));
+        for (let r = 0; r < 8; r++) {
+            let c = 0;
+            for (const ch of rows[r]) {
+                if (ch >= '1' && ch <= '8') {
+                    c += parseInt(ch);
+                } else {
+                    if (!(ch in FEN_PIECES)) throw new Error(`Pièce FEN inconnue : '${ch}'`);
+                    this.board[r][c] = FEN_PIECES[ch];
+                    c++;
+                }
+            }
+            if (c !== 8) throw new Error(`FEN invalide : rangée ${8 - r} malformée`);
+        }
+
+        this.turn = (parts[1] === 'b') ? BLACK : WHITE;
+
+        this.castlingRights = { wK: false, wQ: false, bK: false, bQ: false };
+        if (parts[2] && parts[2] !== '-') {
+            if (parts[2].includes('K')) this.castlingRights.wK = true;
+            if (parts[2].includes('Q')) this.castlingRights.wQ = true;
+            if (parts[2].includes('k')) this.castlingRights.bK = true;
+            if (parts[2].includes('q')) this.castlingRights.bQ = true;
+        }
+
+        this.enPassantSquare = null;
+        if (parts[3] && parts[3] !== '-') {
+            const col = parts[3].charCodeAt(0) - 97;
+            const row = 8 - parseInt(parts[3][1]);
+            this.enPassantSquare = [row, col];
+        }
+
+        this.halfMoveClock  = parts[4] ? parseInt(parts[4]) : 0;
+        this.fullMoveNumber = parts[5] ? parseInt(parts[5]) : 1;
+
+        this.history = [];
+        this.moveList = [];
+        this.gameOver = false;
+        this.gameResult = null;
+        this.capturedByWhite = [];
+        this.capturedByBlack = [];
+    }
+
     generatePGN(options = {}) {
         const {
             whiteName = 'Blancs',

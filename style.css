@@ -365,6 +365,20 @@ header h1 {
 
 .control-group select:focus { outline: none; border-color: #4a90d9; }
 
+.control-group input[type="text"] {
+    width: 100%;
+    padding: 6px 8px;
+    background: #0f2040;
+    color: #e0e0e0;
+    border: 1px solid #1a4a7a;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-family: monospace;
+    box-sizing: border-box;
+}
+.control-group input[type="text"]:focus { outline: none; border-color: #4a90d9; }
+.control-group input[type="text"]::placeholder { color: #4a607a; }
+
 .btn {
     width: 100%;
     padding: 8px 12px;
