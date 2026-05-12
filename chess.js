@@ -42,6 +42,169 @@ function parsePieceName(p) {
     return names[p] || '';
 }
 
+// ============================================================
+//  Evaluation tables — shared with ai.js
+//
+//  Tables are written from white's perspective:
+//      row 0 = rank 8 (top, black's side)
+//      row 7 = rank 1 (white's side)
+//  For black pieces, the row is mirrored (r = 7 - row) so a
+//  single table per piece type serves both colors.
+// ============================================================
+
+const PIECE_PHASE = {
+    [PIECES.W_PAWN]: 0,   [PIECES.B_PAWN]: 0,
+    [PIECES.W_KNIGHT]: 1, [PIECES.B_KNIGHT]: 1,
+    [PIECES.W_BISHOP]: 1, [PIECES.B_BISHOP]: 1,
+    [PIECES.W_ROOK]: 2,   [PIECES.B_ROOK]: 2,
+    [PIECES.W_QUEEN]: 4,  [PIECES.B_QUEEN]: 4,
+    [PIECES.W_KING]: 0,   [PIECES.B_KING]: 0,
+};
+const MAX_PHASE = 24; // 4*1 (knights) + 4*1 (bishops) + 4*2 (rooks) + 2*4 (queens)
+
+// Material values used by the evaluator (king excluded — sentinel handled elsewhere).
+const MATERIAL = {
+    [PIECES.W_PAWN]: 100,   [PIECES.B_PAWN]: 100,
+    [PIECES.W_KNIGHT]: 320, [PIECES.B_KNIGHT]: 320,
+    [PIECES.W_BISHOP]: 330, [PIECES.B_BISHOP]: 330,
+    [PIECES.W_ROOK]: 500,   [PIECES.B_ROOK]: 500,
+    [PIECES.W_QUEEN]: 900,  [PIECES.B_QUEEN]: 900,
+    [PIECES.W_KING]: 0,     [PIECES.B_KING]: 0,
+};
+
+// --- Middlegame piece-square tables ---
+const PST_PAWN_MG = [
+    [ 0,  0,  0,  0,  0,  0,  0,  0],
+    [50, 50, 50, 50, 50, 50, 50, 50],
+    [10, 10, 20, 30, 30, 20, 10, 10],
+    [ 5,  5, 10, 25, 25, 10,  5,  5],
+    [ 0,  0,  0, 20, 20,  0,  0,  0],
+    [ 5, -5,-10,  0,  0,-10, -5,  5],
+    [ 5, 10, 10,-20,-20, 10, 10,  5],
+    [ 0,  0,  0,  0,  0,  0,  0,  0],
+];
+const PST_KNIGHT_MG = [
+    [-50,-40,-30,-30,-30,-30,-40,-50],
+    [-40,-20,  0,  0,  0,  0,-20,-40],
+    [-30,  0, 10, 15, 15, 10,  0,-30],
+    [-30,  5, 15, 20, 20, 15,  5,-30],
+    [-30,  0, 15, 20, 20, 15,  0,-30],
+    [-30,  5, 10, 15, 15, 10,  5,-30],
+    [-40,-20,  0,  5,  5,  0,-20,-40],
+    [-50,-40,-30,-30,-30,-30,-40,-50],
+];
+const PST_BISHOP_MG = [
+    [-20,-10,-10,-10,-10,-10,-10,-20],
+    [-10,  0,  0,  0,  0,  0,  0,-10],
+    [-10,  0,  5, 10, 10,  5,  0,-10],
+    [-10,  5,  5, 10, 10,  5,  5,-10],
+    [-10,  0, 10, 10, 10, 10,  0,-10],
+    [-10, 10, 10, 10, 10, 10, 10,-10],
+    [-10,  5,  0,  0,  0,  0,  5,-10],
+    [-20,-10,-10,-10,-10,-10,-10,-20],
+];
+const PST_ROOK_MG = [
+    [ 0,  0,  0,  0,  0,  0,  0,  0],
+    [ 5, 10, 10, 10, 10, 10, 10,  5],
+    [-5,  0,  0,  0,  0,  0,  0, -5],
+    [-5,  0,  0,  0,  0,  0,  0, -5],
+    [-5,  0,  0,  0,  0,  0,  0, -5],
+    [-5,  0,  0,  0,  0,  0,  0, -5],
+    [-5,  0,  0,  0,  0,  0,  0, -5],
+    [ 0,  0,  0,  5,  5,  0,  0,  0],
+];
+const PST_QUEEN_MG = [
+    [-20,-10,-10, -5, -5,-10,-10,-20],
+    [-10,  0,  0,  0,  0,  0,  0,-10],
+    [-10,  0,  5,  5,  5,  5,  0,-10],
+    [ -5,  0,  5,  5,  5,  5,  0, -5],
+    [  0,  0,  5,  5,  5,  5,  0, -5],
+    [-10,  5,  5,  5,  5,  5,  0,-10],
+    [-10,  0,  5,  0,  0,  0,  0,-10],
+    [-20,-10,-10, -5, -5,-10,-10,-20],
+];
+const PST_KING_MG = [
+    [-30,-40,-40,-50,-50,-40,-40,-30],
+    [-30,-40,-40,-50,-50,-40,-40,-30],
+    [-30,-40,-40,-50,-50,-40,-40,-30],
+    [-30,-40,-40,-50,-50,-40,-40,-30],
+    [-20,-30,-30,-40,-40,-30,-30,-20],
+    [-10,-20,-20,-20,-20,-20,-20,-10],
+    [ 20, 20,  0,  0,  0,  0, 20, 20],
+    [ 20, 30, 10,  0,  0, 10, 30, 20],
+];
+
+// --- Endgame piece-square tables ---
+// Pawns: advancement towards promotion is the dominant factor.
+const PST_PAWN_EG = [
+    [  0,  0,  0,  0,  0,  0,  0,  0],
+    [ 90, 90, 90, 90, 90, 90, 90, 90],
+    [ 50, 50, 50, 50, 50, 50, 50, 50],
+    [ 30, 30, 30, 30, 30, 30, 30, 30],
+    [ 20, 20, 20, 20, 20, 20, 20, 20],
+    [ 10, 10, 10, 10, 10, 10, 10, 10],
+    [  0,  0,  0,  0,  0,  0,  0,  0],
+    [  0,  0,  0,  0,  0,  0,  0,  0],
+];
+// Minor/heavy pieces: similar centralization in MG and EG.
+const PST_KNIGHT_EG = PST_KNIGHT_MG;
+const PST_BISHOP_EG = PST_BISHOP_MG;
+const PST_ROOK_EG   = PST_ROOK_MG;
+const PST_QUEEN_EG  = PST_QUEEN_MG;
+// King: active and central in the endgame, hides in MG.
+const PST_KING_EG = [
+    [-50,-40,-30,-20,-20,-30,-40,-50],
+    [-30,-20,-10,  0,  0,-10,-20,-30],
+    [-30,-10, 20, 30, 30, 20,-10,-30],
+    [-30,-10, 30, 40, 40, 30,-10,-30],
+    [-30,-10, 30, 40, 40, 30,-10,-30],
+    [-30,-10, 20, 30, 30, 20,-10,-30],
+    [-30,-30,  0,  0,  0,  0,-30,-30],
+    [-50,-30,-30,-30,-30,-30,-30,-50],
+];
+
+// Flat lookups: indexed [piece * 64 + row * 8 + col]. Black rows are pre-mirrored.
+const PST_LOOKUP_MG = new Int32Array(13 * 64);
+const PST_LOOKUP_EG = new Int32Array(13 * 64);
+(function _buildPSTLookups() {
+    const mgByPiece = {
+        [PIECES.W_PAWN]: PST_PAWN_MG,   [PIECES.B_PAWN]: PST_PAWN_MG,
+        [PIECES.W_KNIGHT]: PST_KNIGHT_MG,[PIECES.B_KNIGHT]: PST_KNIGHT_MG,
+        [PIECES.W_BISHOP]: PST_BISHOP_MG,[PIECES.B_BISHOP]: PST_BISHOP_MG,
+        [PIECES.W_ROOK]: PST_ROOK_MG,   [PIECES.B_ROOK]: PST_ROOK_MG,
+        [PIECES.W_QUEEN]: PST_QUEEN_MG, [PIECES.B_QUEEN]: PST_QUEEN_MG,
+        [PIECES.W_KING]: PST_KING_MG,   [PIECES.B_KING]: PST_KING_MG,
+    };
+    const egByPiece = {
+        [PIECES.W_PAWN]: PST_PAWN_EG,   [PIECES.B_PAWN]: PST_PAWN_EG,
+        [PIECES.W_KNIGHT]: PST_KNIGHT_EG,[PIECES.B_KNIGHT]: PST_KNIGHT_EG,
+        [PIECES.W_BISHOP]: PST_BISHOP_EG,[PIECES.B_BISHOP]: PST_BISHOP_EG,
+        [PIECES.W_ROOK]: PST_ROOK_EG,   [PIECES.B_ROOK]: PST_ROOK_EG,
+        [PIECES.W_QUEEN]: PST_QUEEN_EG, [PIECES.B_QUEEN]: PST_QUEEN_EG,
+        [PIECES.W_KING]: PST_KING_EG,   [PIECES.B_KING]: PST_KING_EG,
+    };
+    for (let p = 1; p <= 12; p++) {
+        const isW = (p >= 1 && p <= 6);
+        const mgT = mgByPiece[p], egT = egByPiece[p];
+        for (let r = 0; r < 8; r++) {
+            const tr = isW ? r : 7 - r;
+            for (let c = 0; c < 8; c++) {
+                PST_LOOKUP_MG[p * 64 + r * 8 + c] = mgT[tr][c];
+                PST_LOOKUP_EG[p * 64 + r * 8 + c] = egT[tr][c];
+            }
+        }
+    }
+})();
+
+function pstMG(piece, row, col) {
+    if (!piece) return 0;
+    return PST_LOOKUP_MG[piece * 64 + row * 8 + col];
+}
+function pstEG(piece, row, col) {
+    if (!piece) return 0;
+    return PST_LOOKUP_EG[piece * 64 + row * 8 + col];
+}
+
 class ChessGame {
     constructor() {
         this.reset();
@@ -60,6 +223,7 @@ class ChessGame {
         this.gameResult = null;
         this.capturedByWhite = [];
         this.capturedByBlack = [];
+        this._recomputeEvalState();
     }
 
     _initialBoard() {
@@ -84,6 +248,10 @@ class ChessGame {
             enPassantSquare: this.enPassantSquare ? [...this.enPassantSquare] : null,
             halfMoveClock: this.halfMoveClock,
             fullMoveNumber: this.fullMoveNumber,
+            psqt_mg: this.psqt_mg,
+            psqt_eg: this.psqt_eg,
+            material: this.material,
+            phase: this.phase,
         };
     }
 
@@ -94,6 +262,31 @@ class ChessGame {
         this.enPassantSquare = state.enPassantSquare ? [...state.enPassantSquare] : null;
         this.halfMoveClock = state.halfMoveClock;
         this.fullMoveNumber = state.fullMoveNumber;
+        this.psqt_mg = state.psqt_mg;
+        this.psqt_eg = state.psqt_eg;
+        this.material = state.material;
+        this.phase = state.phase;
+    }
+
+    // Full-board scan that recomputes the incremental eval fields.
+    // Called on reset/loadFEN, and as a safety net at the start of a search.
+    _recomputeEvalState() {
+        let psqt_mg = 0, psqt_eg = 0, material = 0, phase = 0;
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                const p = this.board[r][c];
+                if (!p) continue;
+                const sign = isWhitePiece(p) ? 1 : -1;
+                psqt_mg += sign * pstMG(p, r, c);
+                psqt_eg += sign * pstEG(p, r, c);
+                material += sign * MATERIAL[p];
+                phase += PIECE_PHASE[p];
+            }
+        }
+        this.psqt_mg = psqt_mg;
+        this.psqt_eg = psqt_eg;
+        this.material = material;
+        this.phase = phase;
     }
 
     // -------------------------------------------------------
@@ -358,26 +551,57 @@ class ChessGame {
         const [tr, tc] = move.to;
         const piece = this.board[fr][fc];
         const color = pieceColor(piece);
+        const sign = isWhitePiece(piece) ? 1 : -1;
 
         this.enPassantSquare = null;
 
-        // En passant capture
+        // Eval: remove the moving piece from its source square
+        this.psqt_mg -= sign * pstMG(piece, fr, fc);
+        this.psqt_eg -= sign * pstEG(piece, fr, fc);
+
+        // En passant capture — captured pawn sits on an adjacent square, not the destination
         if (move.enPassant) {
             const captureRow = color === WHITE ? tr + 1 : tr - 1;
+            const cap = this.board[captureRow][tc];
+            if (cap) {
+                const csign = isWhitePiece(cap) ? 1 : -1;
+                this.psqt_mg -= csign * pstMG(cap, captureRow, tc);
+                this.psqt_eg -= csign * pstEG(cap, captureRow, tc);
+                this.material -= csign * MATERIAL[cap];
+                // Captured pawn carries no phase weight, so no phase update.
+            }
             this.board[captureRow][tc] = PIECES.EMPTY;
         }
 
-        // Castling: also move rook
+        // Regular capture at the destination square
+        const target = this.board[tr][tc];
+        if (target) {
+            const tsign = isWhitePiece(target) ? 1 : -1;
+            this.psqt_mg -= tsign * pstMG(target, tr, tc);
+            this.psqt_eg -= tsign * pstEG(target, tr, tc);
+            this.material -= tsign * MATERIAL[target];
+            this.phase -= PIECE_PHASE[target];
+        }
+
+        // Castling: also move the rook, and update its PST contribution
         if (move.castle) {
+            let rook, rfr, rfc, rtr, rtc;
             if (piece === PIECES.W_KING) {
-                if (move.castle === 'K') { this.board[7][7] = 0; this.board[7][5] = PIECES.W_ROOK; }
-                else                     { this.board[7][0] = 0; this.board[7][3] = PIECES.W_ROOK; }
+                rook = PIECES.W_ROOK;
+                if (move.castle === 'K') { rfr=7; rfc=7; rtr=7; rtc=5; }
+                else                     { rfr=7; rfc=0; rtr=7; rtc=3; }
                 this.castlingRights.wK = false; this.castlingRights.wQ = false;
             } else {
-                if (move.castle === 'K') { this.board[0][7] = 0; this.board[0][5] = PIECES.B_ROOK; }
-                else                     { this.board[0][0] = 0; this.board[0][3] = PIECES.B_ROOK; }
+                rook = PIECES.B_ROOK;
+                if (move.castle === 'K') { rfr=0; rfc=7; rtr=0; rtc=5; }
+                else                     { rfr=0; rfc=0; rtr=0; rtc=3; }
                 this.castlingRights.bK = false; this.castlingRights.bQ = false;
             }
+            const rsign = isWhitePiece(rook) ? 1 : -1;
+            this.psqt_mg += rsign * (pstMG(rook, rtr, rtc) - pstMG(rook, rfr, rfc));
+            this.psqt_eg += rsign * (pstEG(rook, rtr, rtc) - pstEG(rook, rfr, rfc));
+            this.board[rfr][rfc] = 0;
+            this.board[rtr][rtc] = rook;
         }
 
         // Update castling rights on rook/king moves
@@ -397,8 +621,18 @@ class ChessGame {
             this.enPassantSquare = [(fr + tr) / 2, fc];
         }
 
-        // Move piece
-        this.board[tr][tc] = move.promotion || piece;
+        // Promotion adjusts material and phase before we place the new piece.
+        const newPiece = move.promotion || piece;
+        if (move.promotion) {
+            this.material += sign * (MATERIAL[newPiece] - MATERIAL[piece]);
+            this.phase += PIECE_PHASE[newPiece] - PIECE_PHASE[piece];
+        }
+
+        // Eval: add the moved (or promoted) piece at the destination
+        this.psqt_mg += sign * pstMG(newPiece, tr, tc);
+        this.psqt_eg += sign * pstEG(newPiece, tr, tc);
+
+        this.board[tr][tc] = newPiece;
         this.board[fr][fc] = PIECES.EMPTY;
 
         this.turn = opponent(this.turn);
@@ -585,6 +819,7 @@ class ChessGame {
         this.gameResult = null;
         this.capturedByWhite = [];
         this.capturedByBlack = [];
+        this._recomputeEvalState();
     }
 
     generatePGN(options = {}) {
