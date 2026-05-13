@@ -1,0 +1,5 @@
+# ninja log v7
+30	1824	8004129625677873	CMakeFiles/ChessBot.dir/src/chess.cpp.obj	e5c7a101db2ad037
+36	2654	8004129625762878	CMakeFiles/ChessBot.dir/src/ai.cpp.obj	915cbdfde446cdc6
+26	3531	8004118220727581	CMakeFiles/ChessBot.dir/src/main.cpp.obj	51c11c5744ae536a
+2654	2998	8004129651922373	ChessBot.exe	fb1ad4a0d076a3c4

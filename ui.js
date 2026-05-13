@@ -15,11 +15,22 @@ let aiVsAiInterval = null;
 // --- Web Worker setup (avec fallback synchrone) ---
 let aiWorker = null;
 let workerAvailable = false;
+let _workerTimer = null;
+
+function _workerFallback() {
+    clearTimeout(_workerTimer);
+    _workerTimer = null;
+    if (aiWorker) aiWorker.onmessage = null;
+    workerAvailable = false;
+    aiRunning = false;
+    if (!game.gameOver) runAI();
+}
+
 (function initWorker() {
     try {
         aiWorker = new Worker('ai.worker.js');
-        aiWorker.onmessage = null; // handlers branchés dans runAI
-        aiWorker.onerror = () => { workerAvailable = false; };
+        aiWorker.onmessage = null;
+        aiWorker.onerror = () => _workerFallback();
         workerAvailable = true;
     } catch (e) {
         workerAvailable = false;
@@ -263,8 +274,18 @@ function _updateAIPanel(nodes, depth, ms, move, score) {
 function _onAIMoveReady(move, stats) {
     aiThinking.style.display = 'none';
     aiRunning = false;
+
+    if (!move && !game.gameOver) {
+        const fallback = game.getLegalMoves(game.turn);
+        if (fallback.length > 0) move = fallback[0];
+    }
+
     if (move) executeMove(_pickQueenPromo(move));
     _updateAIPanel(stats.nodes, stats.depth, stats.ms, move, stats.score);
+
+    if (!game.gameOver && gameModeSelect.value === 'ai-vs-ai') {
+        aiVsAiInterval = setTimeout(runAI, 300);
+    }
 }
 
 async function runAI() {
@@ -277,11 +298,12 @@ async function runAI() {
     if (workerAvailable && aiWorker) {
         // --- Mode Worker : UI reste réactive pendant la recherche ---
         const state = game.cloneState();
+        _workerTimer = setTimeout(_workerFallback, timeLimitMs + 4000);
         aiWorker.onmessage = ({ data }) => {
+            clearTimeout(_workerTimer);
+            _workerTimer = null;
             if (data.error) {
-                // Worker a échoué, fallback
-                workerAvailable = false;
-                runAI();
+                _workerFallback();
                 return;
             }
             _onAIMoveReady(data.move, {
@@ -395,13 +417,7 @@ function checkGameOver() {
 
 function startAiVsAi() {
     stopAiVsAi();
-    function tick() {
-        if (game.gameOver || gameModeSelect.value !== 'ai-vs-ai') return;
-        runAI().then(() => {
-            if (!game.gameOver) aiVsAiInterval = setTimeout(tick, 500);
-        });
-    }
-    aiVsAiInterval = setTimeout(tick, 300);
+    aiVsAiInterval = setTimeout(runAI, 300);
 }
 
 function stopAiVsAi() {
@@ -534,7 +550,7 @@ document.getElementById('load-fen-btn').addEventListener('click', () => {
     }
 });
 
-document.getElementById('export-pgn-btn').addEventListener('click', () => {
+function exportPGN() {
     const mode = gameModeSelect.value;
     const playerColor = playerColorSel.value;
     let whiteName = 'Blancs', blackName = 'Noirs';
@@ -544,6 +560,7 @@ document.getElementById('export-pgn-btn').addEventListener('click', () => {
     } else if (mode === 'ai-vs-ai') {
         whiteName = 'IA (Blancs)'; blackName = 'IA (Noirs)';
     }
+    if (game.moveList.length === 0) return;
     const pgn = game.generatePGN({ whiteName, blackName });
     const blob = new Blob([pgn], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
@@ -552,7 +569,10 @@ document.getElementById('export-pgn-btn').addEventListener('click', () => {
     a.download = `partie_echecs_${new Date().toISOString().slice(0,10)}.pgn`;
     a.click();
     URL.revokeObjectURL(url);
-});
+}
+
+document.getElementById('export-pgn-btn').addEventListener('click', exportPGN);
+document.getElementById('export-pgn-controls-btn').addEventListener('click', exportPGN);
 
 gameModeSelect.addEventListener('change', newGame);
 playerColorSel.addEventListener('change', newGame);

@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(cd \"C:\\\\Users\\\\lesco\\\\OneDrive\\\\Documents\\\\Projet Code Personnel\\\\bot chess\"; Get-ChildItem -Recurse -Force | Where-Object { -not $_.PSIsContainer } | Select-Object -ExpandProperty FullName | Sort-Object)",
+      "PowerShell(cd \"C:\\\\Users\\\\lesco\\\\OneDrive\\\\Documents\\\\Projet Code Personnel\\\\bot chess\"; Get-ChildItem -Recurse -Force | Where-Object { -not $_.PSIsContainer -and $_.FullName -notmatch \"\\\\.git\" } | Select-Object -ExpandProperty FullName | Sort-Object)"
+    ]
+  }
+}

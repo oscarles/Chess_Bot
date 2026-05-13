@@ -1241,6 +1241,12 @@ class ChessAI {
 
     this.calcTime = Date.now() - this._startTime;
     this.lastScore = game.turn === WHITE ? lastScore : -lastScore;
+
+    if (!this.bestMoveFound) {
+      const moves = game.getLegalMoves(game.turn);
+      if (moves.length > 0) this.bestMoveFound = moves[0];
+    }
+
     return this.bestMoveFound;
   }
 
